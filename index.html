@@ -1,0 +1,447 @@
+10.04 上午10:54
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="format-detection" content="telephone=yes" />
+    <title>手机跌倒检测+GPS定位</title>
+    <style>
+        *{
+            box-sizing:border-box;
+            margin:0;
+            padding:0;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body{
+            background:#111;
+            color:#fff;
+            padding:16px;
+            min-height:100vh;
+        }
+        .box{
+            max-width:600px;
+            margin:0 auto;
+        }
+        .status{
+            padding:22px;
+            border-radius:16px;
+            background:#1c1c1e;
+            margin-bottom:16px;
+            border:1px solid #2c2c2e;
+        }
+        .alertBg{
+            background:#3a0000 !important;
+            border-color:#a00000 !important;
+        }
+        h2{
+            margin-bottom:14px;
+            font-size:19px;
+            font-weight:600;
+        }
+        .info{
+            color:#aeaeb2;
+            font-size:14px;
+            margin:10px 0;
+            line-height:1.7;
+        }
+        button{
+            width:100%;
+            padding:15px;
+            font-size:16px;
+            font-weight:500;
+            border:none;
+            border-radius:12px;
+            margin:8px 0;
+            cursor:pointer;
+            transition: background 0.2s;
+        }
+        .primary{
+            background:#0a84ff;
+            color:white;
+        }
+        .primary:hover{
+            background:#0070e0;
+        }
+        .danger{
+            background:#ff3b30;
+            color:white;
+        }
+        .danger:hover{
+            background:#e02b20;
+        }
+        .cancel{
+            background:#34c759;
+            color:white;
+        }
+        .cancel:hover{
+            background:#28a745;
+        }
+        .tip{
+            margin-top:22px;
+            font-size:13px;
+            color:#8e8e93;
+            line-height:1.7;
+            background:#1c1c1e;
+            padding:16px;
+            border-radius:12px;
+            border:1px solid #2c2c2e;
+        }
+        /* 苹果风格弹窗遮罩 */
+        .modal-mask{
+            position:fixed;
+            inset:0;
+            background:rgba(0,0,0,0.55);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            display:none;
+            align-items:center;
+            justify-content:center;
+            z-index:999;
+            padding:20px;
+        }
+        .modal-mask.show{
+            display:flex;
+            animation: fadeIn 0.25s ease;
+        }
+        /* 苹果风格弹窗 */
+        .apple-modal{
+            width:100%;
+            max-width:320px;
+            background:#1c1c1e;
+            border-radius:20px;
+            overflow:hidden;
+            box-shadow:0 20px 60px rgba(0,0,0,0.5);
+            animation: scaleIn 0.25s ease;
+        }
+        .modal-header{
+            padding:22px 18px 14px;
+            text-align:center;
+        }
+        .modal-icon{
+            width:54px;
+            height:54px;
+            border-radius:50%;
+            background:#ff3b30;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            margin:0 auto 12px;
+            font-size:28px;
+        }
+        .modal-title{
+            font-size:17px;
+            font-weight:600;
+            margin-bottom:6px;
+        }
+        .modal-message{
+            font-size:14px;
+            color:#aeaeb2;
+            line-height:1.6;
+            white-space:pre-line;
+            word-break:break-all;
+        }
+        .modal-countdown{
+            color:#ff3b30;
+            font-size:22px;
+            font-weight:bold;
+            margin:8px 0;
+        }
+        .modal-body{
+            padding:0 18px 18px;
+        }
+        .modal-map{
+            background:#2c2c2e;
+            border-radius:12px;
+            padding:12px;
+            margin-top:10px;
+            font-size:13px;
+            color:#aeaeb2;
+            word-break:break-all;
+        }
+        .modal-map a{
+            color:#0a84ff;
+            text-decoration:none;
+        }
+        .modal-footer{
+            display:flex;
+            border-top:1px solid #38383a;
+        }
+        .modal-btn{
+            flex:1;
+            padding:14px 0;
+            background:transparent;
+            border:none;
+            color:#0a84ff;
+            font-size:16px;
+            font-weight:500;
+            cursor:pointer;
+            border-right:1px solid #38383a;
+            margin:0;
+            border-radius:0;
+        }
+        .modal-btn:last-child{
+            border-right:none;
+        }
+        .modal-btn.danger-text{
+            color:#ff3b30;
+        }
+        @keyframes fadeIn{
+            from{opacity:0}
+            to{opacity:1}
+        }
+        @keyframes scaleIn{
+            from{transform:scale(0.9);opacity:0}
+            to{transform:scale(1);opacity:1}
+        }
+    </style>
+</head>
+<body>
+<div class="box">
+    <div class="status" id="statusBox">
+        <h2>跌倒监测系统 <span id="timeText">00:00:00</span></h2>
+        <div class="info">状态：<span id="stateText">等待传感器授权...</span></div>
+        <div class="info">加速度：<span id="accelText">0</span></div>
+        <div class="info">纬度：<span id="latText">获取中…</span></div>
+        <div class="info">经度：<span id="lngText">获取中…</span></div>
+    </div>
+    <button class="primary" onclick="startDetect()">▶️开启跌倒监测</button>
+    <button class="danger" onclick="stopDetect()">⏹停止监测</button>
+    <div class="tip">
+说明：<br>
+1.开启后，请允许运动传感器、位置权限<br>
+2.检测摔倒 → 弹窗+警报滴滴声+震动(安卓)，15秒倒计时<br>
+3.倒计时结束/点发送求救：拉起系统短信预填信息，需要手动发送；点【我安全】停止声音震动取消报警<br>
+4.弹窗链接优先唤起高德APP，没有APP打开网页地图，GPS原始坐标自动适配<br>
+⚠️锁屏、切后台声音震动检测全部失效；微信浏览器功能不全，优先手机自带浏览器；iPhone网页无震动，仅响声音。
+    </div>
+</div>
+<!-- 苹果风格弹窗 -->
+<div class="modal-mask" id="appleModal">
+    <div class="apple-modal">
+        <div class="modal-header">
+            <div class="modal-icon"></div>
+            <div class="modal-title">疑似摔倒求救</div>
+            <div class="modal-message" id="modalMessage">检测到疑似摔倒，请确认是否安全。</div>
+            <div class="modal-countdown" id="modalCount">倒计时：15s</div>
+            <div class="modal-map" id="modalMap" style="display:none">
+                <div>当前位置</div>
+                <div style="margin-top:6px" id="mapLink"></div>
+            </div>
+        </div>
+        <div class="modal-body"></div>
+        <div class="modal-footer">
+            <button class="modal-btn" onclick="closeModal()">我安全</button>
+            <button class="modal-btn danger-text" onclick="confirmSOS()">发送求救</button>
+        </div>
+    </div>
+</div>
+<script>
+// ==========在这里修改紧急联系人号码，多个号码英文逗号隔开==========
+const SOS_PHONE = "";
+// =============================================================
+let isRunning = false;
+let watchId = null;
+let timeTimer = null;
+let modalTimer = null;
+let beepTimer = null;
+let vibrateTimer = null;
+const THRESHOLD = 2.5;
+const ALERT_SECOND = 15;
+// 音频：生成滴滴报警音
+let audioCtx = null;
+function initAudio(){
+    if(!audioCtx){
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+function playBeep(){
+    if(!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "square";
+    osc.frequency.value = 880;
+    gain.gain.value = 0.2;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    setTimeout(()=>osc.stop(),180);
+}
+// 开启持续报警声音+震动
+function startAlarmSoundVibrate(){
+    initAudio();
+    //滴滴循环响声
+    beepTimer = setInterval(()=>{
+        playBeep();
+    },450);
+    //安卓持续震动；苹果浏览器不支持vibrate
+    vibrateTimer = setInterval(()=>{
+        if(navigator.vibrate){
+            navigator.vibrate([300,200]);
+        }
+    },600);
+}
+//关闭声音震动
+function stopAlarmSoundVibrate(){
+    clearInterval(beepTimer);
+    clearInterval(vibrateTimer);
+    beepTimer=null;
+    vibrateTimer=null;
+}
+const statusBox = document.getElementById("statusBox");
+const stateText = document.getElementById("stateText");
+const accelText = document.getElementById("accelText");
+const latText = document.getElementById("latText");
+const lngText = document.getElementById("lngText");
+const appleModal = document.getElementById("appleModal");
+const modalMessage = document.getElementById("modalMessage");
+const modalCount = document.getElementById("modalCount");
+const modalMap = document.getElementById("modalMap");
+const mapLink = document.getElementById("mapLink");
+const timeText = document.getElementById("timeText");
+// 拉起系统短信（安卓iOS兼容）
+function openSmsApp(lat,lng){
+    const content = `【跌倒报警】检测到人员疑似摔倒！纬度：${lat}，经度：${lng}，打开链接查看位置：https://uri.amap.com/marker?position=${lng},${lat}&coordinate=wgs84&name=摔倒位置&callnative=1`;
+    const encodeBody = encodeURIComponent(content);
+    let smsUrl;
+    const ua = navigator.userAgent;
+    if(/iPhone|iPad|iPod|iOS/i.test(ua)){
+        smsUrl = `sms:${SOS_PHONE}&body=${encodeBody}`;
+    }else{
+        smsUrl = `sms:${SOS_PHONE}?body=${encodeBody}`;
+    }
+    window.location.href = smsUrl;
+}
+// 实时时钟
+function updateTime(){
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    timeText.innerText = `${h}:${m}:${s}`;
+}
+function startGps(){
+    if(!navigator.geolocation){
+        latText.innerText = "设备不支持定位";
+        lngText.innerText = "-";
+        return;
+    }
+    watchId = navigator.geolocation.watchPosition(
+        function(pos){
+            latText.innerText = pos.coords.latitude.toFixed(6);
+            lngText.innerText = pos.coords.longitude.toFixed(6);
+        },
+        function(err){
+            latText.innerText = "定位失败";
+            lngText.innerText = err.message;
+        },
+        {
+            enableHighAccuracy: true,
+            maximumAge: 1000
+        }
+    );
+}
+function stopGps(){
+    if(watchId !== null){
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+    }
+}
+function startDetect(){
+    if(!window.DeviceMotionEvent){
+        stateText.innerText = "❌浏览器不支持运动传感器";
+        return;
+    }
+    isRunning = true;
+    stateText.innerText = "✅监测运行中，测试请快速下落手机";
+    statusBox.classList.remove("alertBg");
+    startGps();
+    updateTime();
+    timeTimer = setInterval(updateTime,1000);
+    window.addEventListener("devicemotion", motionHandle);
+}
+function stopDetect(){
+    isRunning = false;
+    clearInterval(timeTimer);
+    clearInterval(modalTimer);
+    stopAlarmSoundVibrate();
+    window.removeEventListener("devicemotion", motionHandle);
+    stopGps();
+    stateText.innerText = "⏹已停止监测";
+    statusBox.classList.remove("alertBg");
+}
+function motionHandle(e){
+    if(!isRunning) return;
+    const acc = e.accelerationIncludingGravity;
+    if(!acc) return;
+    const ax = acc.x || 0;
+    const ay = acc.y || 0;
+    const az = acc.z || 0;
+    const magnitude = Math.sqrt(ax * ax + ay * ay + az * az);
+    accelText.innerText = magnitude.toFixed(2);
+    //检测到摔倒，直接弹出苹果弹窗，倒计时在弹窗内部
+    if(magnitude < THRESHOLD){
+        triggerFallAlarm();
+    }
+}
+function triggerFallAlarm(){
+    if(modalTimer) return;
+    isRunning = false;
+    statusBox.classList.add("alertBg");
+    stateText.innerText = "⚠️检测到疑似摔倒！";
+    showAppleModal();
+    startAlarmSoundVibrate(); //摔倒立刻启动滴滴声+震动
+}
+function showAppleModal(){
+    const lat = latText.innerText;
+    const lng = lngText.innerText;
+    let count = ALERT_SECOND;
+    modalCount.innerText = `倒计时：${count}s`;
+    modalMessage.textContent = "检测到疑似摔倒，请确认是否安全。\n倒计时结束将打开短信求救页面，需要手动发送短信。";
+    if(lat !== "获取中…" && lng !== "获取中…"){
+        modalMap.style.display = "block";
+        // 高德官方URI链接：position=经度,纬度；coordinate=wgs84代表GPS原始坐标；callnative=1优先唤起高德APP
+        const amapUri = `https://uri.amap.com/marker?position=${lng},${lat}&coordinate=wgs84&name=摔倒位置&callnative=1`;
+        mapLink.innerHTML = `纬度：${lat}<br>经度：${lng}<br><a href="${amapUri}" target="_blank">查看摔倒位置(高德)</a>`;
+    }else{
+        modalMap.style.display = "none";
+    }
+    appleModal.classList.add("show");
+    //弹窗内倒计时
+    modalTimer = setInterval(()=>{
+        count--;
+        modalCount.innerText = `倒计时：${count}s`;
+        if(count <= 0){
+            clearInterval(modalTimer);
+            modalTimer = null;
+            confirmSOS();
+        }
+    },1000)
+}
+function closeModal(){
+    clearInterval(modalTimer);
+    modalTimer = null;
+    stopAlarmSoundVibrate();
+    appleModal.classList.remove("show");
+    stateText.innerText = "✅已确认安全，监测继续运行";
+    statusBox.classList.remove("alertBg");
+    isRunning = true;
+}
+function confirmSOS(){
+    clearInterval(modalTimer);
+    modalTimer = null;
+    stopAlarmSoundVibrate();
+    const lat = latText.innerText;
+    const lng = lngText.innerText;
+    modalMessage.textContent = "即将打开短信编辑界面，请手动按下发送按钮";
+    modalCount.innerText = "求救唤起";
+    modalMap.style.display = "block";
+    const amapUri = `https://uri.amap.com/marker?position=${lng},${lat}&coordinate=wgs84&name=摔倒位置&callnative=1`;
+    mapLink.innerHTML = `<a href="${amapUri}" target="_blank">查看摔倒位置(高德)</a>`;
+    openSmsApp(lat,lng);
+}
+</script>
+</body>
+</html>
+
